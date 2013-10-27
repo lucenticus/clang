@@ -26,6 +26,9 @@ def CplusplusAlpha : Package<"cplusplus">, InPackage<Alpha>, Hidden;
 def DeadCode : Package<"deadcode">;
 def DeadCodeAlpha : Package<"deadcode">, InPackage<Alpha>, Hidden;
 
+def Different : Package<"different">;
+def DifferentAlpha : Package<"different">, InPackage<Alpha>, Hidden;
+
 def Security : Package <"security">;
 def InsecureAPI : Package<"insecureAPI">, InPackage<Security>;
 def SecurityAlpha : Package<"security">, InPackage<Alpha>, Hidden;
@@ -197,6 +200,18 @@ def VirtualCallChecker : Checker<"VirtualCall">,
   DescFile<"VirtualCallChecker.cpp">;
 
 } // end: "alpha.cplusplus"
+
+//===----------------------------------------------------------------------===//
+// Different checkers.
+//===----------------------------------------------------------------------===//
+
+let ParentPackage = DifferentAlpha in {
+
+def LabelInsideSwitchChecker : Checker<"LabelInsideSwitch">,
+  HelpText<"Warn about label inside switch">,
+  DescFile<"LabelInsideSwitchChecker.cpp">;
+
+} // end "alpha.different"
 
 //===----------------------------------------------------------------------===//
 // Deadcode checkers.
