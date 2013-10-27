@@ -34,6 +34,7 @@ add_clang_library(clangStaticAnalyzerCheckers
   GenericTaintChecker.cpp
   IdempotentOperationChecker.cpp
   IvarInvalidationChecker.cpp
+  LabelInsideSwitchChecker.cpp
   LLVMConventionsChecker.cpp
   MacOSKeychainAPIChecker.cpp
   MacOSXAPIChecker.cpp
