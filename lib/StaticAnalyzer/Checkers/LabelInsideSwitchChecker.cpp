@@ -22,9 +22,10 @@ namespace {
 class WalkAST : public StmtVisitor<WalkAST> {
   BugReporter &BR;
   AnalysisDeclContext* AC;
-
+  const CheckerBase *Checker;
 public:
-  WalkAST(BugReporter &br, AnalysisDeclContext* ac) : BR(br), AC(ac) {}
+  WalkAST(BugReporter &br, const CheckerBase *ch,
+          AnalysisDeclContext* ac) : BR(br),Checker(ch), AC(ac) {}
   void VisitStmt(Stmt *S) { VisitChildren(S); }
   void VisitChildren(Stmt *S);
   void VisitSwitchStmt(SwitchStmt *SS);
@@ -55,7 +56,7 @@ void WalkAST::VisitSwitchStmt(SwitchStmt *SS) {
       SourceRange R = LS->getSourceRange();
       PathDiagnosticLocation ELoc =
           PathDiagnosticLocation::createBegin(LS, BR.getSourceManager(), AC);
-      BR.EmitBasicReport(AC->getDecl(),
+      BR.EmitBasicReport(AC->getDecl(), Checker,
           "Label inside switch",
           "Logic",
           "Possible misprint: label found inside the switch statement",
@@ -75,7 +76,7 @@ class LabelInsideSwitchChecker : public Checker<check::ASTCodeBody> {
 public:
   void checkASTCodeBody(const Decl *D, AnalysisManager& mgr,
       BugReporter &BR) const {
-    WalkAST walker(BR, mgr.getAnalysisDeclContext(D));
+    WalkAST walker(BR, this, mgr.getAnalysisDeclContext(D));
     walker.Visit(D->getBody());
   }
 };

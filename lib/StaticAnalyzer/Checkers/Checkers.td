@@ -15,6 +15,8 @@ include "clang/StaticAnalyzer/Checkers/CheckerBase.td"
 
 def Alpha : Package<"alpha">;
 
+def CERT : Package<"cert">;
+
 def Core : Package<"core">;
 def CoreBuiltin : Package<"builtin">, InPackage<Core>;
 def CoreUninitialized  : Package<"uninitialized">, InPackage<Core>;
@@ -48,6 +50,15 @@ def Containers : Package<"containers">, InPackage<CoreFoundation>;
 
 def LLVM : Package<"llvm">;
 def Debug : Package<"debug">;
+
+//===----------------------------------------------------------------------===//
+// CERT Checkers.
+//===----------------------------------------------------------------------===//
+let ParentPackage = CERT in {
+def DCL_00 : Checker<"DCL_00">,
+    HelpText<"Const-qualify immutable objects">,
+    DescFile<"CERT_02_DCL_00.cpp">;
+} // end "cert"
 
 //===----------------------------------------------------------------------===//
 // Core Checkers.
