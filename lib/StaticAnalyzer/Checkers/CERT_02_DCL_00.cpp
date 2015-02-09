@@ -42,12 +42,6 @@ namespace {
 
 REGISTER_MAP_WITH_PROGRAMSTATE(RegionWriteCounter, const MemRegion*, int)
 
-void DCL_00::reportBug(const char *Msg,
-                               ProgramStateRef State,
-                               CheckerContext &C) const {
-
-}
-
 void DCL_00::checkLocation(SVal Loc, bool IsLoad, const Stmt *S,
                      CheckerContext &C) const {
   const MemRegion *R = Loc.getAsRegion();
@@ -55,24 +49,44 @@ void DCL_00::checkLocation(SVal Loc, bool IsLoad, const Stmt *S,
     return;
   if (!IsLoad)
     return;
-
-  const VarRegion *LVR = dyn_cast_or_null<VarRegion>(Loc.getAsRegion());
-  const VarDecl *VD = LVR->getDecl();
-  VarWriteCounter[VD]++;
+  ProgramStateRef state = C.getState();
+  const int *currentlValue = state->get<RegionWriteCounter>(R);
+  ProgramStateRef newState = nullptr;
+  if (!currentlValue) {
+    newState = state->set<RegionWriteCounter>(R, 1);
+  } else {
+    int newValue = *currentlValue;
+    newState = state->set<RegionWriteCounter>(R, ++newValue);
+  }
+  C.addTransition(newState);
 }
 
 void DCL_00::checkEndAnalysis(ExplodedGraph &G,
 			      BugReporter &BR,
 			      ExprEngine &Eng) const {
+
+  for (auto I = G.nodes_begin(), E = G.nodes_end(); I != E; I++) {
+    ProgramStateRef state = I->getState();
+    RegionWriteCounterTy RWC = state->get<RegionWriteCounter>();
+    for (auto II = RWC.begin(), EE = RWC.end(); II != EE; II++) {
+      const MemRegion *R = II->first;
+      const VarRegion *LVR = dyn_cast_or_null<VarRegion>(R);
+      int value = II->second;
+      const VarDecl *VD = LVR->getDecl();
+      if (VarWriteCounter[VD] < value)
+	VarWriteCounter[VD] = value;
+    }
+  }
+
   for (auto I = VarWriteCounter.begin(), End = VarWriteCounter.end(); I != End;
        I++) {
     if (I->second == 1) {
       const Expr *E = I->first->getAnyInitializer();
-      const AnalysisManager AM = Eng.getAnalysisManager();
       PathDiagnosticLocation PD =
-	PathDiagnosticLocation::createBegin(E, AM.getSourceManager(),
-					    AM.getAnalysisDeclContext(I->first));
-      BR.EmitBasicReport(AM.getAnalysisDeclContext(I->first)->getDecl(), this,
+	PathDiagnosticLocation::createBegin(E, BR.getSourceManager(),
+		     Eng.getAnalysisManager().getAnalysisDeclContext(I->first));
+
+      BR.EmitBasicReport(I->first, this,
                        "02. Declarations and Initialization (DCL)",
                        categories::LogicError,
 			 "DCL00-C. Immutable objects should be const-qualified.",
