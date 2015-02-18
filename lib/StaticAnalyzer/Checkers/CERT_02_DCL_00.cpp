@@ -24,30 +24,36 @@ using namespace clang;
 using namespace ento;
 
 namespace {
-  class DCL_00 : public Checker< check::Location, check::EndAnalysis > {
+  class DCL_00 : public Checker< check::Bind, check::EndAnalysis > {
     mutable std::unique_ptr<BuiltinBug> BT;
         void reportBug(const char *Msg,
                        ProgramStateRef State,
                        CheckerContext &C) const;
     mutable std::map<const VarDecl*, int> VarWriteCounter;
-    public:
-      void checkPreStmt(const BinaryOperator *B, CheckerContext &C) const;
-      void checkLocation(SVal Loc, bool IsLoad, const Stmt *S,
-			 CheckerContext &) const;
-      void checkEndAnalysis(ExplodedGraph &G,
-			      BugReporter &BR,
+  public:
+    void checkPreStmt(const BinaryOperator *B, CheckerContext &C) const;
+    void checkBind(SVal Loc, SVal  Val, const Stmt *S,
+		   CheckerContext &C) const;
+    void checkEndAnalysis(ExplodedGraph &G,
+			  BugReporter &BR,
 			      ExprEngine &Eng) const;
     };
 } // end anonymous namespace
 
 REGISTER_MAP_WITH_PROGRAMSTATE(RegionWriteCounter, const MemRegion*, int)
 
-void DCL_00::checkLocation(SVal Loc, bool IsLoad, const Stmt *S,
+void DCL_00::checkBind(SVal Loc, SVal  Val, const Stmt *S,
                      CheckerContext &C) const {
   const MemRegion *R = Loc.getAsRegion();
   if (!R)
     return;
-  if (!IsLoad)
+  const VarRegion *LVR = dyn_cast_or_null<VarRegion>(R);
+  if (!LVR)
+    return;
+  const VarDecl *VD = LVR->getDecl();
+  if (!VD->hasInit())
+    return;
+  if (VD->getType().isConstQualified())
     return;
   ProgramStateRef state = C.getState();
   const int *currentlValue = state->get<RegionWriteCounter>(R);
@@ -71,6 +77,8 @@ void DCL_00::checkEndAnalysis(ExplodedGraph &G,
     for (auto II = RWC.begin(), EE = RWC.end(); II != EE; II++) {
       const MemRegion *R = II->first;
       const VarRegion *LVR = dyn_cast_or_null<VarRegion>(R);
+      if (!LVR)
+	continue;
       int value = II->second;
       const VarDecl *VD = LVR->getDecl();
       if (VarWriteCounter[VD] < value)
@@ -81,16 +89,14 @@ void DCL_00::checkEndAnalysis(ExplodedGraph &G,
   for (auto I = VarWriteCounter.begin(), End = VarWriteCounter.end(); I != End;
        I++) {
     if (I->second == 1) {
-      const Expr *E = I->first->getAnyInitializer();
       PathDiagnosticLocation PD =
-	PathDiagnosticLocation::createBegin(E, BR.getSourceManager(),
-		     Eng.getAnalysisManager().getAnalysisDeclContext(I->first));
+	PathDiagnosticLocation::createBegin(I->first, BR.getSourceManager());
 
       BR.EmitBasicReport(I->first, this,
                        "02. Declarations and Initialization (DCL)",
                        categories::LogicError,
 			 "DCL00-C. Immutable objects should be const-qualified.",
-			 PD, E->getSourceRange());
+			 PD, I->first->getSourceRange());
     }
   }
 
